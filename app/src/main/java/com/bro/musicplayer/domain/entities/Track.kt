@@ -1,4 +1,4 @@
-package com.bro.musicplayer.domain
+package com.bro.musicplayer.domain.entities
 
 import android.net.Uri
 
