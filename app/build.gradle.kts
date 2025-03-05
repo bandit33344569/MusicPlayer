@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
+    kotlin("plugin.serialization") version "2.1.10"
 }
 
 android {
@@ -42,6 +43,14 @@ android {
 }
 
 dependencies {
+    // Retrofit
+    implementation (libs.retrofit)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.converter.kotlinx.serialization)
+    // OkHttp
+    implementation (libs.okhttp)
+    implementation (libs.logging.interceptor)
+
     implementation (libs.dagger.hilt.android)
     ksp(libs.hilt.compiler)
     implementation (libs.androidx.hilt.hilt.navigation.compose)
@@ -53,6 +62,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
