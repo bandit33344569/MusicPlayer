@@ -1,6 +1,7 @@
 [versions]
 agp = "8.8.1"
 androidxHiltNavigationCompose = "1.2.0"
+coilCompose = "3.1.0"
 hiltAndroidVersion = "2.51.1"
 kotlin = "2.0.0"
 converterKotlinxSerialization = "1.0.0"
@@ -18,6 +19,8 @@ retrofit = "2.11.0"
 
 
 [libraries]
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coilCompose" }
 converter-kotlinx-serialization = { module = "com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter", version.ref = "converterKotlinxSerialization" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-hilt-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHiltNavigationCompose" }
