@@ -24,11 +24,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.size.Size
+import com.bro.musicplayer.R
 import com.bro.musicplayer.domain.entities.Track
 
 
@@ -80,8 +86,14 @@ fun TrackItem(track: Track, onClick: () -> Unit) {
                     .aspectRatio(1f)
             ) {
                 AsyncImage(
-                    model = track.imageUri,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(track.imageUri)
+                        .crossfade(true)
+                        .size(Size(100, 100))
+                        .build(),
                     contentDescription = "Track image",
+                    placeholder = painterResource(R.drawable.music),
+                    error = painterResource(R.drawable.music),
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(MaterialTheme.shapes.medium)

@@ -12,6 +12,7 @@ import android.media.MediaPlayer
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -20,6 +21,7 @@ import com.bro.musicplayer.domain.entities.Track
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,20 +30,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 
 @AndroidEntryPoint
 class MediaPlaybackService : Service() {
-
-    val mediaPlayer: MediaPlayer = MediaPlayer()
+    @Inject
+    lateinit var mediaPlayer: MediaPlayer
 
     private lateinit var notificationManager: NotificationManagerCompat
     private val binder = LocalBinder()
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    // CoroutineScope для работы с Flow
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    // Состояния для передачи в UI
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue
 
@@ -54,6 +54,8 @@ class MediaPlaybackService : Service() {
     val currentTrack: StateFlow<Track?> = _currentTrackIndex
         .combine(_queue) { index, tracks -> tracks.getOrNull(index) }
         .stateIn(serviceScope, SharingStarted.Eagerly, null)
+
+    private var playJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -74,8 +76,11 @@ class MediaPlaybackService : Service() {
                     setQueueAndPlay(tracks, selectedTrack)
                 }
             }
+            ACTION_STOP -> stopPlaybackAndService()
         }
-        updateNotification()
+        if (intent?.action != ACTION_STOP) {
+            updateNotification()
+        }
         return START_NOT_STICKY
     }
 
@@ -89,23 +94,52 @@ class MediaPlaybackService : Service() {
 
     fun setQueueAndPlay(tracks: List<Track>, selectedTrack: Track) {
         _queue.value = tracks
-        _currentTrackIndex.value = tracks.indexOf(selectedTrack)
-        playCurrentTrack()
+        val index = tracks.indexOf(selectedTrack)
+        if (index != -1) {
+            _currentTrackIndex.value = index
+            Log.d("MediaPlaybackService", "Set queue with ${tracks.size} tracks: ${tracks.map { it.title }}")
+            Log.d("MediaPlaybackService", "Playing track at index: $index - ${selectedTrack.title}")
+            playCurrentTrack(selectedTrack) // Передаем трек напрямую
+        } else {
+            Log.e("MediaPlaybackService", "Selected track not found in queue")
+        }
     }
 
     fun playNext() {
         if (_queue.value.isNotEmpty()) {
-            _currentTrackIndex.value = (_currentTrackIndex.value + 1) % _queue.value.size
-            playCurrentTrack()
+            val newIndex = (_currentTrackIndex.value + 1) % _queue.value.size
+            _currentTrackIndex.value = newIndex
+            val nextTrack = _queue.value[newIndex]
+            Log.d("MediaPlaybackService", "Playing next track at index: $newIndex - ${nextTrack.title}")
+            playCurrentTrack(nextTrack)
         }
     }
 
     fun playPrevious() {
         if (_queue.value.isNotEmpty()) {
-            _currentTrackIndex.value =
-                if (_currentTrackIndex.value > 0) _currentTrackIndex.value - 1
-                else _queue.value.size - 1
-            playCurrentTrack()
+            val newIndex = if (_currentTrackIndex.value > 0) _currentTrackIndex.value - 1 else _queue.value.size - 1
+            _currentTrackIndex.value = newIndex
+            val prevTrack = _queue.value[newIndex]
+            Log.d("MediaPlaybackService", "Playing previous track at index: $newIndex - ${prevTrack.title}")
+            playCurrentTrack(prevTrack)
+        }
+    }
+
+    private fun playCurrentTrack(track: Track) {
+        playJob?.cancel() // Отменяем предыдущую задачу
+        playJob = serviceScope.launch {
+            try {
+                mediaPlayer.reset()
+                mediaPlayer.setDataSource(track.pathUri.toString())
+                mediaPlayer.prepare()
+                mediaPlayer.start()
+                _isPlaying.value = true
+                Log.d("MediaPlaybackService", "Playing track: ${track.title}")
+                updateNotification()
+            } catch (e: Exception) {
+                Log.e("MediaPlaybackService", "Error playing track: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
@@ -113,75 +147,51 @@ class MediaPlaybackService : Service() {
         if (mediaPlayer.isPlaying) {
             mediaPlayer.pause()
             _isPlaying.value = false
-        } else {
+        } else if (!mediaPlayer.isPlaying && mediaPlayer.currentPosition > 0) {
             mediaPlayer.start()
             _isPlaying.value = true
         }
         updateNotification()
     }
 
-    private fun playCurrentTrack() {
-        serviceScope.launch {
-            currentTrack.value?.let { track ->
-                mediaPlayer.reset()
-                try {
-                    mediaPlayer.setDataSource(track.pathUri.toString())
-                    mediaPlayer.prepare()
-                    mediaPlayer.start()
-                    _isPlaying.value = true
-                    updateNotification()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+    private fun stopPlaybackAndService() {
+        playJob?.cancel()
+        mediaPlayer.stop()
+        mediaPlayer.reset()
+        _isPlaying.value = false
+        _queue.value = emptyList()
+        _currentTrackIndex.value = 0
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun updateNotification() {
         val currentTrack = currentTrack.value ?: return
-
         val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.music)
             .setContentTitle(currentTrack.title)
             .setContentText(currentTrack.author)
-            .addAction(
-                R.drawable.back,
-                "Previous",
-                getPendingIntent(ACTION_PREVIOUS)
-            )
+            .addAction(R.drawable.back, "Previous", getPendingIntent(ACTION_PREVIOUS))
             .addAction(
                 if (_isPlaying.value) R.drawable.pause else R.drawable.play,
                 if (_isPlaying.value) "Pause" else "Play",
                 getPendingIntent(ACTION_PLAY_PAUSE)
             )
-            .addAction(
-                R.drawable.next,
-                "Next",
-                getPendingIntent(ACTION_NEXT)
-            )
+            .addAction(R.drawable.next, "Next", getPendingIntent(ACTION_NEXT))
+            .addAction(R.drawable.pause, "Stop", getPendingIntent(ACTION_STOP))
             .setOngoing(true)
             .build()
 
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return
         }
         notificationManager.notify(NOTIFICATION_ID, notification)
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     private fun getPendingIntent(action: String): PendingIntent {
-        val intent = Intent(this, MediaPlaybackService::class.java).apply {
-            this.action = action
-        }
-        return PendingIntent.getService(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val intent = Intent(this, MediaPlaybackService::class.java).apply { this.action = action }
+        return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     private fun createNotificationChannel() {
@@ -217,5 +227,6 @@ class MediaPlaybackService : Service() {
         const val ACTION_NEXT = "ACTION_NEXT"
         const val ACTION_PREVIOUS = "ACTION_PREVIOUS"
         const val ACTION_SET_QUEUE_AND_PLAY = "ACTION_SET_QUEUE_AND_PLAY"
+        const val ACTION_STOP = "ACTION_STOP"
     }
 }

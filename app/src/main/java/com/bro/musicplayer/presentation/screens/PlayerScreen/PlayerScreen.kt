@@ -44,7 +44,6 @@ fun PlayerScreen(
     var mediaPlaybackService: MediaPlaybackService? by remember { mutableStateOf(null) }
     var isBound by remember { mutableStateOf(false) }
 
-    // Настройка ServiceConnection
     val serviceConnection = remember {
         object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -60,10 +59,9 @@ fun PlayerScreen(
         }
     }
 
-    // Привязка к сервису
     DisposableEffect(Unit) {
         val intent = Intent(context, MediaPlaybackService::class.java)
-        context.startService(intent) // Запускаем сервис как Foreground
+        context.startService(intent)
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
 
         onDispose {
@@ -71,11 +69,9 @@ fun PlayerScreen(
                 context.unbindService(serviceConnection)
                 isBound = false
             }
-            // Сервис продолжает работать как Foreground, поэтому не останавливаем его
         }
     }
 
-    // Отображаем UI только после подключения к сервису
     if (!isBound || mediaPlaybackService == null) {
         Column(
             modifier = modifier.fillMaxSize(),
