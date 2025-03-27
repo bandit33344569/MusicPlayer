@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Лаунчер для READ_EXTERNAL_STORAGE/READ_MEDIA_AUDIO
     private val storagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
