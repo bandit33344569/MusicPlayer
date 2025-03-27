@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.Intent
 import android.os.Bundle
+import androidx.core.app.ActivityCompat.finishAffinity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
@@ -13,13 +14,11 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class MusicPlayerApplication : Application() {
-    private var activeActivityCount = 0
 
     override fun onCreate() {
         super.onCreate()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
-                activeActivityCount++
             }
 
             override fun onActivityStarted(activity: Activity) {
@@ -38,12 +37,10 @@ class MusicPlayerApplication : Application() {
             }
 
             override fun onActivityDestroyed(activity: Activity) {
-                activeActivityCount--
-                if (activeActivityCount <= 0) {
                     val intent = Intent(this@MusicPlayerApplication, MediaPlaybackService::class.java)
                     intent.action = MediaPlaybackService.ACTION_STOP
                     startService(intent)
-                }
+                finishAffinity(activity)
             }
         })
     }

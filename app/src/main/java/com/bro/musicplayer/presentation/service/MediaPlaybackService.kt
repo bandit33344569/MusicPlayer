@@ -92,14 +92,14 @@ class MediaPlaybackService : Service() {
         fun getService(): MediaPlaybackService = this@MediaPlaybackService
     }
 
-    fun setQueueAndPlay(tracks: List<Track>, selectedTrack: Track) {
+    private fun setQueueAndPlay(tracks: List<Track>, selectedTrack: Track) {
         _queue.value = tracks
         val index = tracks.indexOf(selectedTrack)
         if (index != -1) {
             _currentTrackIndex.value = index
             Log.d("MediaPlaybackService", "Set queue with ${tracks.size} tracks: ${tracks.map { it.title }}")
             Log.d("MediaPlaybackService", "Playing track at index: $index - ${selectedTrack.title}")
-            playCurrentTrack(selectedTrack) // Передаем трек напрямую
+            playCurrentTrack(selectedTrack)
         } else {
             Log.e("MediaPlaybackService", "Selected track not found in queue")
         }
@@ -125,8 +125,8 @@ class MediaPlaybackService : Service() {
         }
     }
 
-    private fun playCurrentTrack(track: Track) {
-        playJob?.cancel() // Отменяем предыдущую задачу
+    fun playCurrentTrack(track: Track) {
+        playJob?.cancel()
         playJob = serviceScope.launch {
             try {
                 mediaPlayer.reset()
@@ -154,7 +154,7 @@ class MediaPlaybackService : Service() {
         updateNotification()
     }
 
-    private fun stopPlaybackAndService() {
+    fun stopPlaybackAndService() {
         playJob?.cancel()
         mediaPlayer.stop()
         mediaPlayer.reset()
@@ -219,6 +219,7 @@ class MediaPlaybackService : Service() {
         serviceScope.cancel()
         super.onDestroy()
     }
+
 
     companion object {
         const val NOTIFICATION_CHANNEL_ID = "music_player_channel"
