@@ -5,10 +5,6 @@ import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import androidx.core.app.ActivityCompat.finishAffinity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import com.bro.musicplayer.presentation.service.MediaPlaybackService
 import dagger.hilt.android.HiltAndroidApp
 
